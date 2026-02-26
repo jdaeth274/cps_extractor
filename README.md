@@ -95,7 +95,6 @@ If you run the pipeline using the `--serotype` argument, the pangenome analysis 
 ## Accepted Inputs
 - Only Illumina paired-end short reads are supported
 - Input is provided via a **tab-separated samplesheet** (`.tsv`) with these columns:
-- Optional first-line header is supported (e.g. `sample	read1	read2	assembly`) and comment lines starting with `#` are ignored.
   1. isolate/sample name (required)
   2. read 1 path (required)
   3. read 2 path (required)
