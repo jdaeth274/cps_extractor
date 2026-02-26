@@ -23,9 +23,10 @@ void helpMessage() {
         |Usage:
         |./run_cps_extractor [option] [value]
         |
-        |--input [PATH]                  Path to the input directory that contains reads to be processed. Default: ./input
+        |--input [PATH]                  Path to input TSV with columns: sample,read1,read2[,assembly]. Default: ./input.tsv
         |--output [PATH]                 Path to the output directory that save the results. Default: output
         |--serotype [STR]                Serotype (if known). Default: None
+        |--unicycler_threads [INT]       Threads for Unicycler assembly. Default: 32
         |--setup                         Alternative workflow for setting up the required databases.
         |--version                       Alternative workflow for getting versions of pipeline, container images, tools and databases
         |--help                          Print this help message
@@ -38,7 +39,7 @@ void helpMessage() {
 // Workflow selection message
 void workflowSelectMessage(String selectedWorkflow) {
     String message
-    File inputDir = new File(params.input)
+    File inputFile = new File(params.input)
     File outputDir = new File(params.output)
 
     switch (selectedWorkflow) {
@@ -46,7 +47,7 @@ void workflowSelectMessage(String selectedWorkflow) {
             message = """
             |The main pipeline workflow has been selected.
             |
-            |Input Directory: ${inputDir.canonicalPath}
+            |Input TSV: ${inputFile.canonicalPath}
             |Output Directory: ${outputDir.canonicalPath}
             """.stripMargin()
             break
