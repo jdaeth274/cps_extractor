@@ -94,13 +94,22 @@ If you run the pipeline using the `--serotype` argument, the pangenome analysis 
 
 ## Accepted Inputs
 - Only Illumina paired-end short reads are supported
-- Each sample is expected to be a pair of raw reads following this file name pattern: 
-  - `*_{,R}{1,2}{,_001}.{fq,fastq}{,.gz}`
-    - example 1: SampleName_R1_001.fastq.gz, SampleName_R2_001.fastq.gz
-    - example 2: SampleName_1.fastq.gz, SampleName_2.fastq.gz
-    - example 3: SampleName_R1.fq, SampleName_R2.fq
-    
-  
+- Input is provided via a **tab-separated samplesheet** (`.tsv`) with these columns:
+- Optional first-line header is supported (e.g. `sample	read1	read2	assembly`) and comment lines starting with `#` are ignored.
+  1. isolate/sample name (required)
+  2. read 1 path (required)
+  3. read 2 path (required)
+  4. assembly FASTA path (optional)
+- If column 4 is provided for a sample, the pipeline will use that assembly and skip Unicycler for that sample.
+
+Example `input.tsv`:
+
+```tsv
+ISO001	/path/ISO001_R1.fastq.gz	/path/ISO001_R2.fastq.gz
+ISO002	/path/ISO002_R1.fastq.gz	/path/ISO002_R2.fastq.gz	/path/ISO002_assembly.fasta
+```
+
+
 ## Setup 
 1. Clone the repository (if Git is installed on your system)
     ```
@@ -128,13 +137,13 @@ If you run the pipeline using the `--serotype` argument, the pangenome analysis 
 > ⚠️ Docker or Singularity must be running.
 <!-- -->
 > ℹ️ By default, Docker is used as the container engine and all the processes are executed by the local machine. See [Profile](#profile) for details on running the pipeline with Singularity or on a HPC cluster.
-- You can run the pipeline without options. It will attempt to get the raw reads from the default location (i.e. `input` directory inside the `cps_extractor` local directory)
+- You can run the pipeline without options. It will attempt to read the default samplesheet (`input.tsv` inside the `cps_extractor` local directory).
   ```
   ./run_cps_extractor
   ```
 - You can also specify the location of the raw reads by adding the `--input` option
   ```
-  ./run_cps_extractor --input /path/to/raw-reads-directory
+  ./run_cps_extractor --input /path/to/input.tsv
   ```
 
 ## Options
@@ -142,9 +151,10 @@ If you run the pipeline using the `--serotype` argument, the pangenome analysis 
   |Usage:
   |./run_cps_extractor [option] [value]
   |
-  |--input [PATH]                  Path to the input directory that contains reads to be processed. Default: ./input
+  |--input [PATH]                  Path to the input TSV (sample,read1,read2[,assembly]). Default: ./input.tsv
   |--output [PATH]                 Path to the output directory that save the results. Default: output
   |--serotype [STR]                Serotype (if known). Default: None
+  |--unicycler_threads [INT]       Threads for Unicycler assembly. Default: 32
   |--setup                         Alternative workflow for setting up the required databases.
   |--version                       Alternative workflow for getting versions of pipeline, container images, tools and databases
   |--help                          Print this help message
@@ -170,11 +180,11 @@ If you run the pipeline using the `--serotype` argument, the pangenome analysis 
   > ℹ️ `-resume` is a built-in Nextflow option, it only has one leading `-`
   - If the original command is
     ```
-    ./run_cps_extractor --input /path/to/raw-reads-directory
+    ./run_cps_extractor --input /path/to/input.tsv
     ```
   - The command to resume the pipeline execution should be
     ```
-    ./run_cps_extractor --input /path/to/raw-reads-directory -resume
+    ./run_cps_extractor --input /path/to/input.tsv -resume
     ```
 
 ## Clean Up
@@ -223,12 +233,13 @@ If you run the pipeline using the `--serotype` argument, the pangenome analysis 
 ## General options
   | Option | Values | Description |
   | --- | ---| --- |
-  | `--input` | Any valid path containing paired end fastq.gz files <br />(Default: `$projectDir/input`) | Input folder containing S.pneumoniae reads |
+  | `--input` | Any valid path to a TSV file <br />(Default: `$projectDir/input.tsv`) | Input samplesheet with columns: sample, read1, read2, optional assembly |
   | `--output` | Any valid path <br />(Default: `$projectDir/output`) | Output folder which stores the pipeline results |
   | `--blastdb` | Any valid blast database path `.n*` <br />(Default: `$projectDir/cps_reference_database/cps_blastdb`| Path to blast database containing CPS references |
   | `--prodigal_training_file` | Any valid path containing a prodigal training file <br />(Default: `$projectDir/cps_reference_database/all.trn` | Training file for improved annotation |
   | `--bakta_db` | Any valid path containing a bakta database <br />(Default: `$projectDir/cps_reference_database/bakta_db`) | Path to bakta database used for annotation |
   | `--bakta_threads` | Any valid integer value <br />(Default: 32) | Threads used for bakta annotation
+  | `--unicycler_threads` | Any valid integer value <br />(Default: 32) | Threads used for Unicycler assembly
   | `--reference_database` | Any valid reference database path <br />(Default: `$projectDir/cps_reference_database`) | Full reference database used by the pipeline |
   | `--serotype` | Any valid serotype string <br />(Default: None) | Manually set the serotype of your input sequences instead of having it determined by SeroBA |  
   | `--minimum_cps_length` | Any valid integer value <br />(Default: 8000) | Minimum length of CPS sequence to pass quality control
