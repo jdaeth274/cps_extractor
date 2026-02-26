@@ -1,0 +1,3 @@
+# sample\tread1\tread2\tassembly(optional)
+# ISO001\t/path/to/ISO001_R1.fastq.gz\t/path/to/ISO001_R2.fastq.gz
+# ISO002\t/path/to/ISO002_R1.fastq.gz\t/path/to/ISO002_R2.fastq.gz\t/path/to/ISO002_assembly.fasta

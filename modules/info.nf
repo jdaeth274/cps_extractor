@@ -230,7 +230,7 @@ process SAVE {
     path "info.txt", emit: info
 
     exec:
-    File inputDir = new File(params.input)
+    File inputFile = new File(params.input)
     File outputDir = new File(params.output)
 
     def textRow = { leftSpace, rightSpace, leftContent, rightContent ->
@@ -246,7 +246,7 @@ process SAVE {
     |╔══════════╤══════════════════════════════════════════════════════════════════════════════════════╗
     |${ioTextRow('Type', 'Path')}
     |╠══════════╪══════════════════════════════════════════════════════════════════════════════════════╣
-    |${ioTextRow('Input', inputDir.canonicalPath)}
+    |${ioTextRow('Input TSV', inputFile.canonicalPath)}
     |${ioTextRow('Output', outputDir.canonicalPath)}
     |╚══════════╧══════════════════════════════════════════════════════════════════════════════════════╝
     |""".stripMargin()
