@@ -32,7 +32,12 @@ workflow PIPELINE {
             .fromPath(params.input, checkIfExists: true)
             .splitCsv(header: false, sep: '\t')
             .filter { row ->
-                row && row.size() >= 3 && row[0] && !row[0].toString().startsWith('#')
+                row && row.size() >= 3 && row[0]
+            }
+            .map { row -> row.collect { it == null ? '' : it.toString().trim() } }
+            .filter { row ->
+                def sample = row[0].toLowerCase()
+                !row[0].startsWith('#') && !(sample in ['sample', 'isolate', 'isolate_name', 'sample_name'])
             }
             .map { row ->
                 def sample_id = row[0].toString().trim()
@@ -48,7 +53,7 @@ workflow PIPELINE {
             SEROBA( reads_ch )
             reads_sero_ch = SEROBA.out.reads_sero_ch
         } else {
-            reads_sero_ch = reads_ch.map { it -> it + "$params.serotype" }
+            reads_sero_ch = reads_ch.map { sample_id, reads -> tuple(sample_id, reads, "${params.serotype}") }
         }
 
         // Filter out non encapsulated strains before running ARIBA
