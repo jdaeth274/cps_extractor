@@ -97,7 +97,7 @@ workflow PIPELINE {
 
         CHECK_CPS_SEQUENCE( GAP_FILLER.out.gap_filled_ch, results_dir_ch.first() )
 
-        BAKTA( CHECK_CPS_SEQUENCE.out.results_ch, prodigal_training_file.first(), bakta_db.first(), reference_db_ch.first() )
+        BAKTA( CHECK_CPS_SEQUENCE.out.results_ch, prodigal_training_file.first(), bakta_db.first(), reference_db_ch.first(), params.bakta_threads )
 
         EXTRACT_PROTEIN_SEQUENCES( BAKTA.out.bakta_results_ch )
 

@@ -95,6 +95,7 @@ If you run the pipeline using the `--serotype` argument, the pangenome analysis 
 ## Accepted Inputs
 - Only Illumina paired-end short reads are supported
 - Input is provided via a **tab-separated samplesheet** (`.tsv`) with these columns:
+- Optional first-line header is supported (e.g. `sample	read1	read2	assembly`) and comment lines starting with `#` are ignored.
   1. isolate/sample name (required)
   2. read 1 path (required)
   3. read 2 path (required)
@@ -144,6 +145,7 @@ ISO002	/path/ISO002_R1.fastq.gz	/path/ISO002_R2.fastq.gz	/path/ISO002_assembly.f
   ```
   ./run_cps_extractor --input /path/to/input.tsv
   ```
+- If Bakta is killed with exit code `137` (out-of-memory), rerun with fewer Bakta threads, e.g. `--bakta_threads 8` or `--bakta_threads 4`.
 
 ## Options
   ```

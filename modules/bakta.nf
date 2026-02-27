@@ -11,6 +11,7 @@ process BAKTA {
     path(prodigal_training_file)
     path(bakta_db)
     path(reference_database)
+    val(bakta_threads)
 
     output:
     tuple val(sample_id), path(bakta_results), path(cps), path(annotation_file), path(gb_file), val(reference), emit: bakta_results_ch
@@ -23,6 +24,6 @@ process BAKTA {
     """
     # rename cps with copy to avoid caching issues
     cp ${cps_sequence} ${sample_id}_cps.fa
-    bakta --db ${bakta_db} -t "`nproc`" -o ${sample_id}_bakta --prodigal-tf ${prodigal_training_file} --proteins ${reference_database}/proteins/${reference}_proteins.txt --skip-plot ${sample_id}_cps.fa
+    bakta --db ${bakta_db} -t "${bakta_threads}" -o ${sample_id}_bakta --prodigal-tf ${prodigal_training_file} --proteins ${reference_database}/proteins/${reference}_proteins.txt --skip-plot ${sample_id}_cps.fa
     """
 }
