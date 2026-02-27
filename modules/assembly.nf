@@ -9,6 +9,7 @@ process ASSEMBLY_UNICYCLER {
     input:
     tuple val(sample_id), path(reads), val(sero)
     val min_contig_length
+    val unicycler_threads
 
     output:
     tuple val(sample_id), path(fasta), val(sero), path(reads), emit: assembly_ch
@@ -18,7 +19,7 @@ process ASSEMBLY_UNICYCLER {
     read2="${reads[1]}"
     fasta="${sample_id}.contigs.fasta"
     """
-    unicycler -1 "$read1" -2 "$read2"  -t "`nproc`" -o results --mode bold
+    unicycler -1 "$read1" -2 "$read2" -t "${unicycler_threads}" -o results --mode bold
     mv results/assembly.fasta "${fasta}"
     """
 }
