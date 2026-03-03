@@ -8,9 +8,11 @@ validParams = [
     ariba_db: 'path',
     bakta_db_path: 'path',
     bakta_threads: 'int',
+    bakta_memory_gb: 'int',
+    bakta_max_forks: 'int',
     bakta_db: 'path_exist',
     blastdb: 'path_blast_db',
-    input: 'path_exist',
+    input: 'path_tsv',
     minimum_cps_length: 'int',
     output: 'path',
     lite: 'boolean',
@@ -19,6 +21,7 @@ validParams = [
     maxretries: 'int',
     prodigal_training_file: 'path_exist',
     min_contig_length: 'int',
+    unicycler_threads: 'int',
     serotype: 'int_str'
 ]
 

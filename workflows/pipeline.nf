@@ -26,15 +26,34 @@ workflow PIPELINE {
 
         bakta_db = Channel.fromPath( params.bakta_db )
 
-        reads_ch = Channel.fromFilePairs( "$params.input/*_{,R}{1,2}{,_001}.{fq.gz,fastq.gz}", checkIfExists: true )
-
         reference_db_ch = Channel.fromPath( params.reference_database )
+
+        samples_ch = Channel
+            .fromPath(params.input, checkIfExists: true)
+            .splitCsv(header: false, sep: '\t')
+            .filter { row ->
+                row && row.size() >= 3 && row[0]
+            }
+            .map { row -> row.collect { it == null ? '' : it.toString().trim() } }
+            .filter { row ->
+                def sample = row[0].toLowerCase()
+                !row[0].startsWith('#') && !(sample in ['sample', 'isolate', 'isolate_name', 'sample_name'])
+            }
+            .map { row ->
+                def sample_id = row[0].toString().trim()
+                def read1 = file(row[1].toString().trim())
+                def read2 = file(row[2].toString().trim())
+                def assembly = (row.size() > 3 && row[3] && row[3].toString().trim()) ? file(row[3].toString().trim()) : null
+                tuple(sample_id, [read1, read2], assembly)
+            }
+
+        reads_ch = samples_ch.map { sample_id, reads, assembly -> tuple(sample_id, reads) }
 
         if ( !params.serotype ) {
             SEROBA( reads_ch )
             reads_sero_ch = SEROBA.out.reads_sero_ch
         } else {
-            reads_sero_ch = reads_ch.map { it -> it + "$params.serotype" }
+            reads_sero_ch = reads_ch.map { sample_id, reads -> tuple(sample_id, reads, "${params.serotype}") }
         }
 
         // Filter out non encapsulated strains before running ARIBA
@@ -53,8 +72,22 @@ workflow PIPELINE {
         key_mutations_ch = FIND_KEY_MUTATIONS.out.key_mutations_sample_ch.collect()
 
         COLLECT_KEY_MUTATIONS( key_mutations_ch )
-        
-        assembly_ch = ASSEMBLY_UNICYCLER( reads_sero_ch, params.min_contig_length )
+
+        assembly_input_ch = samples_ch.map { sample_id, reads, assembly -> tuple(sample_id, assembly) }
+
+        reads_sero_assembly_ch = reads_sero_ch.join(assembly_input_ch, by: 0)
+
+        provided_assembly_ch = reads_sero_assembly_ch
+                                .filter { it[3] }
+                                .map { sample_id, reads, sero, assembly -> tuple(sample_id, assembly, sero, reads) }
+
+        reads_for_assembly_ch = reads_sero_assembly_ch
+                                 .filter { !it[3] }
+                                 .map { sample_id, reads, sero, assembly -> tuple(sample_id, reads, sero) }
+
+        generated_assembly_ch = ASSEMBLY_UNICYCLER( reads_for_assembly_ch, params.min_contig_length, params.unicycler_threads )
+
+        assembly_ch = provided_assembly_ch.mix(generated_assembly_ch)
 
         BLASTN( assembly_ch, blast_db_ch.first(), reference_db_ch.first() )
 
@@ -64,7 +97,7 @@ workflow PIPELINE {
 
         CHECK_CPS_SEQUENCE( GAP_FILLER.out.gap_filled_ch, results_dir_ch.first() )
 
-        BAKTA( CHECK_CPS_SEQUENCE.out.results_ch, prodigal_training_file.first(), bakta_db.first(), reference_db_ch.first() )
+        BAKTA( CHECK_CPS_SEQUENCE.out.results_ch, prodigal_training_file.first(), bakta_db.first(), reference_db_ch.first(), params.bakta_threads )
 
         EXTRACT_PROTEIN_SEQUENCES( BAKTA.out.bakta_results_ch )
 
@@ -94,7 +127,7 @@ workflow PIPELINE {
                                                               .flatten()
                                                               .map { file -> tuple(file.baseName.split('-')[-1], file) }
                                                               .groupTuple()
-                                                              
+
             CONCAT_PROTEIN_SEQUENCES( proteins_ch )
         }
 }
