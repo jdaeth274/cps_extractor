@@ -8,6 +8,8 @@ validParams = [
     ariba_db: 'path',
     bakta_db_path: 'path',
     bakta_threads: 'int',
+    bakta_memory_gb: 'int',
+    bakta_max_forks: 'int',
     bakta_db: 'path_exist',
     blastdb: 'path_blast_db',
     input: 'path_tsv',

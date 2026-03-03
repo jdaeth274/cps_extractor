@@ -27,6 +27,8 @@ void helpMessage() {
         |--output [PATH]                 Path to the output directory that save the results. Default: output
         |--serotype [STR]                Serotype (if known). Default: None
         |--unicycler_threads [INT]       Threads for Unicycler assembly. Default: 32
+        |--bakta_memory_gb [INT]         Memory in GB per Bakta task. Default: 32
+        |--bakta_max_forks [INT]         Max concurrent Bakta tasks. Default: 1
         |--setup                         Alternative workflow for setting up the required databases.
         |--version                       Alternative workflow for getting versions of pipeline, container images, tools and databases
         |--help                          Print this help message

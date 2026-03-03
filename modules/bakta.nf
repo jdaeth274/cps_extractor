@@ -4,6 +4,10 @@ process BAKTA {
     label 'bakta_container'
     label 'farm_high_mem'
 
+    cpus params.bakta_threads
+    memory { params.bakta_memory_gb.GB }
+    maxForks params.bakta_max_forks
+
     tag "$sample_id"
 
     input:

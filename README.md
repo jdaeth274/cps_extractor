@@ -133,6 +133,13 @@ ISO002	/path/ISO002_R1.fastq.gz	/path/ISO002_R2.fastq.gz	/path/ISO002_assembly.f
       ./run_cps_extractor --setup -profile singularity
       ```
 
+## Practical tip for Bakta on clusters
+- Bakta can be memory-intensive, especially with high thread counts.
+- If you see Bakta exit `137`, reduce threads and/or parallelism, for example:
+  ```
+  ./run_cps_extractor --input /path/to/input.tsv --bakta_threads 8 --bakta_max_forks 1
+  ```
+
 ## Run
 > ⚠️ Docker or Singularity must be running.
 <!-- -->
@@ -240,6 +247,8 @@ ISO002	/path/ISO002_R1.fastq.gz	/path/ISO002_R2.fastq.gz	/path/ISO002_assembly.f
   | `--prodigal_training_file` | Any valid path containing a prodigal training file <br />(Default: `$projectDir/cps_reference_database/all.trn` | Training file for improved annotation |
   | `--bakta_db` | Any valid path containing a bakta database <br />(Default: `$projectDir/cps_reference_database/bakta_db`) | Path to bakta database used for annotation |
   | `--bakta_threads` | Any valid integer value <br />(Default: 32) | Threads used for bakta annotation
+  | `--bakta_memory_gb` | Any valid integer value <br />(Default: 32) | Memory (GB) reserved per Bakta task
+  | `--bakta_max_forks` | Any valid integer value <br />(Default: 1) | Maximum concurrent Bakta tasks
   | `--unicycler_threads` | Any valid integer value <br />(Default: 32) | Threads used for Unicycler assembly
   | `--reference_database` | Any valid reference database path <br />(Default: `$projectDir/cps_reference_database`) | Full reference database used by the pipeline |
   | `--serotype` | Any valid serotype string <br />(Default: None) | Manually set the serotype of your input sequences instead of having it determined by SeroBA |  
