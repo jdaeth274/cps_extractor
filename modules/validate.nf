@@ -22,7 +22,8 @@ validParams = [
     prodigal_training_file: 'path_exist',
     min_contig_length: 'int',
     unicycler_threads: 'int',
-    serotype: 'int_str'
+    serotype: 'int_str',
+    skip_info: 'boolean'
 ]
 
 // Validate whether all provided parameters are valid

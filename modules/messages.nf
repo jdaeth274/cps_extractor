@@ -26,9 +26,11 @@ void helpMessage() {
         |--input [PATH]                  Path to input TSV with columns: sample,read1,read2[,assembly]. Default: ./input.tsv
         |--output [PATH]                 Path to the output directory that save the results. Default: output
         |--serotype [STR]                Serotype (if known). Default: None
+        |--bakta_threads [INT]           Threads for Bakta annotation. Default: 8
         |--unicycler_threads [INT]       Threads for Unicycler assembly. Default: 32
         |--bakta_memory_gb [INT]         Memory in GB per Bakta task. Default: 32
         |--bakta_max_forks [INT]         Max concurrent Bakta tasks. Default: 1
+        |--skip_info [BOOL]              Skip SAVE_INFO metadata workflow. Default: false
         |--setup                         Alternative workflow for setting up the required databases.
         |--version                       Alternative workflow for getting versions of pipeline, container images, tools and databases
         |--help                          Print this help message

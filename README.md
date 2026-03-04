@@ -140,6 +140,42 @@ ISO002	/path/ISO002_R1.fastq.gz	/path/ISO002_R2.fastq.gz	/path/ISO002_assembly.f
   ./run_cps_extractor --input /path/to/input.tsv --bakta_threads 8 --bakta_max_forks 1
   ```
 
+## Throughput profile (recommended for large runs)
+For large-scale jobs (hundreds to thousands of isolates), use the new `throughput` profile in combination with your execution profile:
+
+```bash
+./run_cps_extractor --input /path/to/input.tsv --output /path/to/output -profile lsf,throughput
+```
+
+This profile is tuned for throughput by default:
+- `--bakta_threads 4`
+- `--bakta_memory_gb 12`
+- `--bakta_max_forks 8`
+- `--unicycler_threads 8`
+- `--skip_info true`
+
+You can still override any of these on the command line.
+
+## Utility: build CPS alignments/VCF from Panaroo output
+If you already have Panaroo output and a serotype reference GenBank, you can build CPS-focused outputs without rerunning the full pipeline.
+
+Script:
+```bash
+./bin/build_cps_from_panaroo.py   --panaroo-dir /path/to/panaroo_output   --reference-gb /path/to/serotype3_reference.gb   --output /path/to/cps_from_panaroo   --threads 8
+```
+
+Outputs include:
+- `cps_gene_mapping.tsv` (reference CDS to Panaroo gene mapping by BLAST)
+- `cps_gene_alignments/` (subset per-gene alignments)
+- `cps_fastas/` (per-isolate concatenated CPS FASTA)
+- `cps_core_alignment.fasta` (multi-sample CPS alignment)
+- `cps_core_snps.vcf` (SNP VCF from `snp-sites`)
+
+Notes:
+- CPS genes are chosen from the reference GenBank CDS features excluding pseudogenes and transposon-like annotations.
+- Mapping is sequence-based (BLAST), not gene-name based.
+- Requires `blastn`, `makeblastdb`, and `snp-sites` in `$PATH`.
+
 ## Run
 > ⚠️ Docker or Singularity must be running.
 <!-- -->
@@ -246,9 +282,10 @@ ISO002	/path/ISO002_R1.fastq.gz	/path/ISO002_R2.fastq.gz	/path/ISO002_assembly.f
   | `--blastdb` | Any valid blast database path `.n*` <br />(Default: `$projectDir/cps_reference_database/cps_blastdb`| Path to blast database containing CPS references |
   | `--prodigal_training_file` | Any valid path containing a prodigal training file <br />(Default: `$projectDir/cps_reference_database/all.trn` | Training file for improved annotation |
   | `--bakta_db` | Any valid path containing a bakta database <br />(Default: `$projectDir/cps_reference_database/bakta_db`) | Path to bakta database used for annotation |
-  | `--bakta_threads` | Any valid integer value <br />(Default: 32) | Threads used for bakta annotation
+  | `--bakta_threads` | Any valid integer value <br />(Default: 8) | Threads used for bakta annotation
   | `--bakta_memory_gb` | Any valid integer value <br />(Default: 32) | Memory (GB) reserved per Bakta task
   | `--bakta_max_forks` | Any valid integer value <br />(Default: 1) | Maximum concurrent Bakta tasks
+  | `--skip_info` | `true` or `false` <br />(Default: `false`) | Skip metadata/version collection (`info.txt`) for faster runs |
   | `--unicycler_threads` | Any valid integer value <br />(Default: 32) | Threads used for Unicycler assembly
   | `--reference_database` | Any valid reference database path <br />(Default: `$projectDir/cps_reference_database`) | Full reference database used by the pipeline |
   | `--serotype` | Any valid serotype string <br />(Default: None) | Manually set the serotype of your input sequences instead of having it determined by SeroBA |  
