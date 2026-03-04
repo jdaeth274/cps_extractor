@@ -45,7 +45,9 @@ workflow {
     } else {
         workflowSelectMessage('pipeline')
         PIPELINE()
-        SAVE_INFO(pipelineVersion)
+        if (!params.skip_info) {
+            SAVE_INFO(pipelineVersion)
+        }
     }
 }
 
