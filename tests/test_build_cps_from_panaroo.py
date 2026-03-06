@@ -36,3 +36,9 @@ def test_is_not_excluded_regular_cps_gene():
 
 def test_sanitize_isolate_name():
     assert mod.sanitize_isolate_name("iso 1/a") == "iso_1_a"
+
+
+def test_parse_presence_cell():
+    assert mod.parse_presence_cell('') == []
+    assert mod.parse_presence_cell('id1;id2') == ['id1', 'id2']
+    assert mod.parse_presence_cell('"id1"; "id2"') == ['id1', 'id2']

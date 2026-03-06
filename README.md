@@ -166,7 +166,8 @@ Script:
 
 Outputs include:
 - `cps_gene_mapping.tsv` (reference CDS to Panaroo gene mapping by BLAST)
-- `cps_gene_alignments/` (subset per-gene alignments)
+- `cps_gene_sequences_raw/` (per-gene raw CDS sequences from Panaroo combined DNA CDS)
+- `cps_gene_alignments/` (gene-by-gene alignments generated with MAFFT)
 - `cps_fastas/` (per-isolate concatenated CPS FASTA)
 - `cps_core_alignment.fasta` (multi-sample CPS alignment)
 - `cps_core_snps.vcf` (SNP VCF from `snp-sites`)
@@ -174,7 +175,8 @@ Outputs include:
 Notes:
 - CPS genes are chosen from the reference GenBank CDS features excluding pseudogenes and transposon-like annotations.
 - Mapping is sequence-based (BLAST), not gene-name based.
-- Requires `blastn`, `makeblastdb`, and `snp-sites` in `$PATH`.
+- Isolate gene sequences are reconstructed from `gene_presence_absence.csv` + `combined_DNA_CDS.fasta`.
+- Requires `blastn`, `makeblastdb`, `mafft`, and `snp-sites` in `$PATH`.
 
 ## Run
 > ⚠️ Docker or Singularity must be running.
