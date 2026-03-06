@@ -4,6 +4,10 @@ process BAKTA {
     label 'bakta_container'
     label 'farm_high_mem'
 
+    cpus params.bakta_threads
+    memory { params.bakta_memory_gb.GB }
+    maxForks params.bakta_max_forks
+
     tag "$sample_id"
 
     input:
@@ -23,6 +27,6 @@ process BAKTA {
     """
     # rename cps with copy to avoid caching issues
     cp ${cps_sequence} ${sample_id}_cps.fa
-    bakta --db ${bakta_db} -t "`nproc`" -o ${sample_id}_bakta --prodigal-tf ${prodigal_training_file} --proteins ${reference_database}/proteins/${reference}_proteins.txt --skip-plot ${sample_id}_cps.fa
+    bakta --db ${bakta_db} -t "${task.cpus}" -o ${sample_id}_bakta --prodigal-tf ${prodigal_training_file} --proteins ${reference_database}/proteins/${reference}_proteins.txt --skip-plot ${sample_id}_cps.fa
     """
 }

@@ -94,13 +94,22 @@ If you run the pipeline using the `--serotype` argument, the pangenome analysis 
 
 ## Accepted Inputs
 - Only Illumina paired-end short reads are supported
-- Each sample is expected to be a pair of raw reads following this file name pattern: 
-  - `*_{,R}{1,2}{,_001}.{fq,fastq}{,.gz}`
-    - example 1: SampleName_R1_001.fastq.gz, SampleName_R2_001.fastq.gz
-    - example 2: SampleName_1.fastq.gz, SampleName_2.fastq.gz
-    - example 3: SampleName_R1.fq, SampleName_R2.fq
-    
-  
+- Input is provided via a **tab-separated samplesheet** (`.tsv`) with these columns:
+- Optional first-line header is supported (e.g. `sample	read1	read2	assembly`) and comment lines starting with `#` are ignored.
+  1. isolate/sample name (required)
+  2. read 1 path (required)
+  3. read 2 path (required)
+  4. assembly FASTA path (optional)
+- If column 4 is provided for a sample, the pipeline will use that assembly and skip Unicycler for that sample.
+
+Example `input.tsv`:
+
+```tsv
+ISO001	/path/ISO001_R1.fastq.gz	/path/ISO001_R2.fastq.gz
+ISO002	/path/ISO002_R1.fastq.gz	/path/ISO002_R2.fastq.gz	/path/ISO002_assembly.fasta
+```
+
+
 ## Setup 
 1. Clone the repository (if Git is installed on your system)
     ```
@@ -124,27 +133,74 @@ If you run the pipeline using the `--serotype` argument, the pangenome analysis 
       ./run_cps_extractor --setup -profile singularity
       ```
 
+## Practical tip for Bakta on clusters
+- Bakta can be memory-intensive, especially with high thread counts.
+- If you see Bakta exit `137`, reduce threads and/or parallelism, for example:
+  ```
+  ./run_cps_extractor --input /path/to/input.tsv --bakta_threads 8 --bakta_max_forks 1
+  ```
+
+## Throughput profile (recommended for large runs)
+For large-scale jobs (hundreds to thousands of isolates), use the new `throughput` profile in combination with your execution profile:
+
+```bash
+./run_cps_extractor --input /path/to/input.tsv --output /path/to/output -profile lsf,throughput
+```
+
+This profile is tuned for throughput by default:
+- `--bakta_threads 4`
+- `--bakta_memory_gb 12`
+- `--bakta_max_forks 8`
+- `--unicycler_threads 8`
+- `--skip_info true`
+
+You can still override any of these on the command line.
+
+## Utility: build CPS alignments/VCF from Panaroo output
+If you already have Panaroo output and a serotype reference GenBank, you can build CPS-focused outputs without rerunning the full pipeline.
+
+Script:
+```bash
+./bin/build_cps_from_panaroo.py   --panaroo-dir /path/to/panaroo_output   --reference-gb /path/to/serotype3_reference.gb   --output /path/to/cps_from_panaroo   --threads 8
+```
+
+Outputs include:
+- `cps_gene_mapping.tsv` (reference CDS to Panaroo gene mapping by BLAST)
+- `cps_gene_sequences_raw/` (per-gene raw CDS sequences from Panaroo combined DNA CDS)
+- `cps_gene_alignments/` (gene-by-gene alignments generated with MAFFT)
+- `cps_fastas/` (per-isolate concatenated CPS FASTA)
+- `cps_core_alignment.fasta` (multi-sample CPS alignment)
+- `cps_core_snps.vcf` (SNP VCF from `snp-sites`)
+
+Notes:
+- CPS genes are chosen from the reference GenBank CDS features excluding pseudogenes and transposon-like annotations.
+- Mapping is sequence-based (BLAST), not gene-name based.
+- Isolate gene sequences are reconstructed preferentially from `gene_data.csv` (DNA sequence column); if missing, fallback is `gene_presence_absence.csv` + `combined_DNA_CDS.fasta`.
+- Requires `blastn`, `makeblastdb`, `mafft`, and `snp-sites` in `$PATH`.
+
 ## Run
 > ⚠️ Docker or Singularity must be running.
 <!-- -->
 > ℹ️ By default, Docker is used as the container engine and all the processes are executed by the local machine. See [Profile](#profile) for details on running the pipeline with Singularity or on a HPC cluster.
-- You can run the pipeline without options. It will attempt to get the raw reads from the default location (i.e. `input` directory inside the `cps_extractor` local directory)
+- You can run the pipeline without options. It will attempt to read the default samplesheet (`input.tsv` inside the `cps_extractor` local directory).
   ```
   ./run_cps_extractor
   ```
 - You can also specify the location of the raw reads by adding the `--input` option
   ```
-  ./run_cps_extractor --input /path/to/raw-reads-directory
+  ./run_cps_extractor --input /path/to/input.tsv
   ```
+- If Bakta is killed with exit code `137` (out-of-memory), rerun with fewer Bakta threads, e.g. `--bakta_threads 8` or `--bakta_threads 4`.
 
 ## Options
   ```
   |Usage:
   |./run_cps_extractor [option] [value]
   |
-  |--input [PATH]                  Path to the input directory that contains reads to be processed. Default: ./input
+  |--input [PATH]                  Path to the input TSV (sample,read1,read2[,assembly]). Default: ./input.tsv
   |--output [PATH]                 Path to the output directory that save the results. Default: output
   |--serotype [STR]                Serotype (if known). Default: None
+  |--unicycler_threads [INT]       Threads for Unicycler assembly. Default: 32
   |--setup                         Alternative workflow for setting up the required databases.
   |--version                       Alternative workflow for getting versions of pipeline, container images, tools and databases
   |--help                          Print this help message
@@ -170,11 +226,11 @@ If you run the pipeline using the `--serotype` argument, the pangenome analysis 
   > ℹ️ `-resume` is a built-in Nextflow option, it only has one leading `-`
   - If the original command is
     ```
-    ./run_cps_extractor --input /path/to/raw-reads-directory
+    ./run_cps_extractor --input /path/to/input.tsv
     ```
   - The command to resume the pipeline execution should be
     ```
-    ./run_cps_extractor --input /path/to/raw-reads-directory -resume
+    ./run_cps_extractor --input /path/to/input.tsv -resume
     ```
 
 ## Clean Up
@@ -223,12 +279,16 @@ If you run the pipeline using the `--serotype` argument, the pangenome analysis 
 ## General options
   | Option | Values | Description |
   | --- | ---| --- |
-  | `--input` | Any valid path containing paired end fastq.gz files <br />(Default: `$projectDir/input`) | Input folder containing S.pneumoniae reads |
+  | `--input` | Any valid path to a TSV file <br />(Default: `$projectDir/input.tsv`) | Input samplesheet with columns: sample, read1, read2, optional assembly |
   | `--output` | Any valid path <br />(Default: `$projectDir/output`) | Output folder which stores the pipeline results |
   | `--blastdb` | Any valid blast database path `.n*` <br />(Default: `$projectDir/cps_reference_database/cps_blastdb`| Path to blast database containing CPS references |
   | `--prodigal_training_file` | Any valid path containing a prodigal training file <br />(Default: `$projectDir/cps_reference_database/all.trn` | Training file for improved annotation |
   | `--bakta_db` | Any valid path containing a bakta database <br />(Default: `$projectDir/cps_reference_database/bakta_db`) | Path to bakta database used for annotation |
-  | `--bakta_threads` | Any valid integer value <br />(Default: 32) | Threads used for bakta annotation
+  | `--bakta_threads` | Any valid integer value <br />(Default: 8) | Threads used for bakta annotation
+  | `--bakta_memory_gb` | Any valid integer value <br />(Default: 32) | Memory (GB) reserved per Bakta task
+  | `--bakta_max_forks` | Any valid integer value <br />(Default: 1) | Maximum concurrent Bakta tasks
+  | `--skip_info` | `true` or `false` <br />(Default: `false`) | Skip metadata/version collection (`info.txt`) for faster runs |
+  | `--unicycler_threads` | Any valid integer value <br />(Default: 32) | Threads used for Unicycler assembly
   | `--reference_database` | Any valid reference database path <br />(Default: `$projectDir/cps_reference_database`) | Full reference database used by the pipeline |
   | `--serotype` | Any valid serotype string <br />(Default: None) | Manually set the serotype of your input sequences instead of having it determined by SeroBA |  
   | `--minimum_cps_length` | Any valid integer value <br />(Default: 8000) | Minimum length of CPS sequence to pass quality control
