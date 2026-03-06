@@ -175,7 +175,7 @@ Outputs include:
 Notes:
 - CPS genes are chosen from the reference GenBank CDS features excluding pseudogenes and transposon-like annotations.
 - Mapping is sequence-based (BLAST), not gene-name based.
-- Isolate gene sequences are reconstructed from `gene_presence_absence.csv` + `combined_DNA_CDS.fasta`.
+- Isolate gene sequences are reconstructed preferentially from `gene_data.csv` (DNA sequence column); if missing, fallback is `gene_presence_absence.csv` + `combined_DNA_CDS.fasta`.
 - Requires `blastn`, `makeblastdb`, `mafft`, and `snp-sites` in `$PATH`.
 
 ## Run

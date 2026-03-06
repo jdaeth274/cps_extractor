@@ -5,9 +5,7 @@ Build CPS-focused outputs from Panaroo outputs + serotype reference GenBank.
 Approach (sequence-driven, not gene-name-driven):
 1) Extract CDS from reference GenBank, excluding pseudogenes/transposon-like entries.
 2) BLAST reference CDS against Panaroo pan_genome_reference.fa to map CPS genes to Panaroo clusters.
-3) Reconstruct per-isolate gene sequences for mapped clusters using:
-   - gene_presence_absence.csv (cluster x isolate membership)
-   - combined_DNA_CDS.fasta (actual DNA CDS sequences)
+3) Reconstruct per-isolate gene sequences for mapped clusters, preferring gene_data.csv DNA sequences.
 4) For each mapped CPS gene, create an MSA (mafft) across isolates.
 5) Concatenate per-gene MSAs in reference order to create per-isolate CPS FASTA and core alignment.
 6) Create SNP VCF using snp-sites from concatenated alignment.
@@ -21,9 +19,9 @@ import shutil
 import subprocess
 import sys
 import tempfile
-from collections import OrderedDict
+from collections import OrderedDict, defaultdict
 from pathlib import Path
-from typing import Dict, Iterable, List, Set, Tuple
+from typing import Dict, Iterable, List, Optional, Set, Tuple
 
 from Bio import SeqIO
 from Bio.SeqFeature import SeqFeature
@@ -180,7 +178,6 @@ def read_combined_dna_cds(path: Path) -> Dict[str, str]:
         rid = rec.id.strip()
         seq = str(rec.seq)
         seqs[rid] = seq
-        # Also index first whitespace token of full description when useful
         desc0 = rec.description.split()[0].strip()
         if desc0 and desc0 not in seqs:
             seqs[desc0] = seq
@@ -195,7 +192,7 @@ def read_gene_presence_absence(path: Path) -> Tuple[List[str], Dict[str, Dict[st
 
         rows: Dict[str, Dict[str, List[str]]] = {}
         for row in reader:
-            gene = row.get("Gene", "").strip()
+            gene = (row.get("Gene") or "").strip()
             if not gene:
                 continue
             rows[gene] = {
@@ -203,6 +200,61 @@ def read_gene_presence_absence(path: Path) -> Tuple[List[str], Dict[str, Dict[st
             }
 
     return isolate_columns, rows
+
+
+def _norm(s: str) -> str:
+    return s.strip().lower().replace(" ", "_")
+
+
+def find_column(fieldnames: List[str], candidates: List[str]) -> Optional[str]:
+    if not fieldnames:
+        return None
+    norm_map = {_norm(f): f for f in fieldnames}
+    for c in candidates:
+        if _norm(c) in norm_map:
+            return norm_map[_norm(c)]
+    # soft contains fallback
+    for f in fieldnames:
+        nf = _norm(f)
+        if any(_norm(c) in nf for c in candidates):
+            return f
+    return None
+
+
+def read_gene_data(path: Path) -> Tuple[Set[str], Dict[str, Dict[str, List[str]]]]:
+    """
+    Return: isolates set, mapping panaroo_gene -> isolate -> list[DNA seq].
+    """
+    with path.open(newline="") as h:
+        reader = csv.DictReader(h)
+        fieldnames = reader.fieldnames or []
+
+        gene_col = find_column(fieldnames, ["Gene", "gene", "cluster", "gene_id", "panaroo_gene"])
+        iso_col = find_column(fieldnames, ["isolate", "genome", "sample", "strain"])
+        dna_col = find_column(fieldnames, ["dna_sequence", "dna", "nucleotide_sequence", "sequence", "seq"])
+
+        if not gene_col or not dna_col:
+            raise RuntimeError(
+                "Could not parse gene_data.csv columns. Need gene and DNA sequence columns. "
+                f"Found: {fieldnames}"
+            )
+
+        mapping: Dict[str, Dict[str, List[str]]] = defaultdict(lambda: defaultdict(list))
+        isolates: Set[str] = set()
+
+        for row in reader:
+            gene = (row.get(gene_col) or "").strip()
+            dna = (row.get(dna_col) or "").strip()
+            if not gene or not dna:
+                continue
+
+            isolate = (row.get(iso_col) or "").strip() if iso_col else ""
+            if not isolate:
+                isolate = "unknown"
+            isolates.add(isolate)
+            mapping[gene][isolate].append(dna)
+
+    return isolates, mapping
 
 
 def sanitize_isolate_name(name: str) -> str:
@@ -216,7 +268,6 @@ def write_fasta(path: Path, seqs: Dict[str, str]) -> None:
 
 
 def align_gene(in_fa: Path, out_fa: Path, threads: int) -> None:
-    # MAFFT required for robust gene-by-gene alignment
     which_or_raise("mafft")
     cmd = ["mafft", "--thread", str(threads), "--auto", str(in_fa)]
     proc = subprocess.run(cmd, capture_output=True, text=True)
@@ -237,14 +288,21 @@ def read_alignment(path: Path) -> OrderedDict[str, str]:
 def best_seq_for_ids(ids: Iterable[str], seq_index: Dict[str, str]) -> str | None:
     best = None
     for gid in ids:
-        seq = seq_index.get(gid)
-        if seq is None:
-            # heuristic: sometimes ids have pipe-suffixed fields
-            seq = seq_index.get(gid.split("|")[0])
+        seq = seq_index.get(gid) or seq_index.get(gid.split("|")[0])
         if seq is None:
             continue
         if best is None or len(seq) > len(best):
             best = seq
+    return best
+
+
+def best_seq_from_list(seqs: Iterable[str]) -> str | None:
+    best = None
+    for s in seqs:
+        if not s:
+            continue
+        if best is None or len(s) > len(best):
+            best = s
     return best
 
 
@@ -258,12 +316,11 @@ def main() -> int:
     pan_ref = panaroo_dir / "pan_genome_reference.fa"
     gpa_csv = panaroo_dir / "gene_presence_absence.csv"
     combined_cds = panaroo_dir / "combined_DNA_CDS.fasta"
+    gene_data_csv = panaroo_dir / "gene_data.csv"
 
-    for req in (pan_ref, gpa_csv, combined_cds):
-        if not req.exists():
-            raise FileNotFoundError(f"Missing required Panaroo file: {req}")
+    if not pan_ref.exists():
+        raise FileNotFoundError(f"Missing required Panaroo file: {pan_ref}")
 
-    # external tools
     which_or_raise("makeblastdb")
     which_or_raise("blastn")
     which_or_raise("snp-sites")
@@ -293,8 +350,31 @@ def main() -> int:
     if not mapped_order:
         raise RuntimeError("BLAST mapped genes exist but none match reference order")
 
-    isolate_cols, gpa = read_gene_presence_absence(gpa_csv)
-    seq_index = read_combined_dna_cds(combined_cds)
+    # Preferred reconstruction source: gene_data.csv
+    source = "gene_data"
+    isolate_cols: List[str] = []
+    gene_to_iso_seqlist: Dict[str, Dict[str, List[str]]] = {}
+
+    if gene_data_csv.exists():
+        isolates, g2i = read_gene_data(gene_data_csv)
+        isolate_cols = sorted(isolates)
+        gene_to_iso_seqlist = g2i
+    else:
+        source = "gene_presence_absence+combined_DNA_CDS"
+        if not gpa_csv.exists() or not combined_cds.exists():
+            raise FileNotFoundError(
+                "Need either gene_data.csv OR both gene_presence_absence.csv and combined_DNA_CDS.fasta"
+            )
+        isolate_cols, gpa = read_gene_presence_absence(gpa_csv)
+        seq_index = read_combined_dna_cds(combined_cds)
+
+        g2i: Dict[str, Dict[str, List[str]]] = defaultdict(lambda: defaultdict(list))
+        for gene, iso_map in gpa.items():
+            for iso, ids in iso_map.items():
+                seq = best_seq_for_ids(ids, seq_index)
+                if seq:
+                    g2i[gene][iso].append(seq)
+        gene_to_iso_seqlist = g2i
 
     mapping_tsv = output / "cps_gene_mapping.tsv"
     with mapping_tsv.open("w", newline="") as h:
@@ -303,22 +383,17 @@ def main() -> int:
         for rg, pg in mapped_order:
             w.writerow([rg, pg])
 
-    # Build per-gene sequence collections from gene_presence_absence + combined_DNA_CDS
     usable_gene_alignments: List[Tuple[str, str, OrderedDict[str, str]]] = []
     all_isolates: Set[str] = set(isolate_cols)
 
     for ref_gene, pan_gene in mapped_order:
-        if pan_gene not in gpa:
-            continue
-
+        iso_map = gene_to_iso_seqlist.get(pan_gene, {})
         per_isolate_seq: OrderedDict[str, str] = OrderedDict()
         for iso in isolate_cols:
-            ids = gpa[pan_gene].get(iso, [])
-            seq = best_seq_for_ids(ids, seq_index)
+            seq = best_seq_from_list(iso_map.get(iso, []))
             if seq:
                 per_isolate_seq[iso] = seq
 
-        # Need >=2 seqs to align meaningfully
         if len(per_isolate_seq) < 2:
             continue
 
@@ -331,11 +406,8 @@ def main() -> int:
         usable_gene_alignments.append((ref_gene, pan_gene, aln))
 
     if not usable_gene_alignments:
-        raise RuntimeError(
-            "No usable CPS genes could be reconstructed from gene_presence_absence.csv + combined_DNA_CDS.fasta"
-        )
+        raise RuntimeError("No usable CPS genes could be reconstructed from selected Panaroo source")
 
-    # Build concatenated core alignment in reference-gene order
     isolate_concat: Dict[str, List[str]] = {
         sanitize_isolate_name(iso): [] for iso in sorted(all_isolates)
     }
@@ -359,6 +431,7 @@ def main() -> int:
     with summary.open("w", newline="") as h:
         w = csv.writer(h, delimiter="\t")
         w.writerow(["metric", "value"])
+        w.writerow(["reconstruction_source", source])
         w.writerow(["reference_genes_kept", len(ref_gene_order)])
         w.writerow(["mapped_genes", len(mapped_order)])
         w.writerow(["genes_with_alignments", len(usable_gene_alignments)])
